@@ -11,7 +11,126 @@
   font-family:Arial,Helvetica,sans-serif;
   --bg:#07131d;--panel:#0d2433;--panel2:#102b3c;--line:#2b5068;--text:#f3f8fb;--muted:#8fa9b9;
   --blue:#1785cb;--green:#20b864;--red:#c84d4d;--orange:#d98c26;--gray:#587184;--shadow:0 12px 28px rgba(0,0,0,.24)
+}<!doctype html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#081722">
+<title>Florian Salzburg · Fahrzeugterminal</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.15.2/mqtt.min.js"></script>
+<style>
+:root{
+  font-family:Arial,Helvetica,sans-serif;
+  --bg:#07131d;--panel:#0d2433;--panel2:#102b3c;--line:#2b5068;--text:#f3f8fb;--muted:#8fa9b9;
+  --blue:#1785cb;--green:#20b864;--red:#c84d4d;--orange:#d98c26;--gray:#587184;--shadow:0 12px 28px rgba(0,0,0,.24)
 }
+html[data-theme="light"]{--bg:#eef4f7;--panel:#fff;--panel2:#f7fafc;--line:#c7d8e2;--text:#163244;--muted:#6a8494;--shadow:0 10px 24px rgba(53,89,112,.12)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);min-height:100vh}
+.top{position:sticky;top:0;z-index:20;background:var(--panel);border-bottom:1px solid var(--line);padding:12px 14px;box-shadow:0 4px 14px rgba(0,0,0,.12)}
+.toprow{display:flex;align-items:center;justify-content:space-between;gap:10px;max-width:760px;margin:auto}.brand small{display:block;color:var(--muted);font-size:10px;font-weight:900;letter-spacing:.6px}.brand h1{margin:3px 0 0;font-size:20px;line-height:1.1}.tools{display:flex;gap:8px}.iconbtn{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:10px;padding:8px 10px;font-weight:900;font-size:16px}.conn{max-width:760px;margin:7px auto 0;display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12px}.dot{width:9px;height:9px;border-radius:50%;background:#728995}.dot.ok{background:#2bd36e;box-shadow:0 0 8px #2bd36e}.dot.wait{background:#e5a52f}.dot.bad{background:#e35c5c}
+.wrap{max-width:760px;margin:auto;padding:12px}.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:15px;margin-bottom:12px;box-shadow:var(--shadow)}
+.title{color:var(--muted);font-size:10px;font-weight:950;letter-spacing:.7px;text-transform:uppercase;margin-bottom:10px}.hidden{display:none!important}
+label{display:block;color:var(--muted);font-size:11px;font-weight:900;margin-bottom:9px}input,select{width:100%;height:48px;margin-top:5px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);color:var(--text);padding:0 11px;font-size:16px}input[readonly]{opacity:.8}.btn{width:100%;min-height:56px;border:0;border-radius:12px;color:#fff;font-size:16px;font-weight:950;padding:12px;margin-top:9px;background:var(--blue)}.btn:disabled{opacity:.36}.btn.green{background:var(--green)}.btn.orange{background:var(--orange)}.btn.red{background:var(--red)}.btn.gray{background:var(--gray)}
+.vehicleLine{display:flex;justify-content:space-between;align-items:center;gap:12px}.vehicleName{font-size:24px;font-weight:950}.badge{display:inline-flex;align-items:center;padding:7px 10px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);font-size:12px;font-weight:950}.badge.ready{background:#123a26;border-color:#2f704a;color:#99e7b2}.badge.off{background:#421f22;border-color:#7e3b40;color:#ffb3b8}html[data-theme="light"] .badge.ready{background:#e9f8ef;color:#247548}html[data-theme="light"] .badge.off{background:#fff0f0;color:#a43a3a}
+.waiting{text-align:center;padding:34px 10px}.waitingIcon{font-size:40px;margin-bottom:8px}.waitingTitle{font-size:25px;font-weight:950}.waitingSub{color:var(--muted);margin-top:6px;font-size:13px}.crewBig{font-size:27px;font-weight:950;margin:2px 0 10px}.ack{padding:11px 12px;border-radius:10px;background:#123622;border:1px solid #2e754b;color:#9ce7b4;font-weight:900;font-size:13px}html[data-theme="light"] .ack{background:#eaf8ef;color:#267448;border-color:#b2d8c0}
+.jobAddr{font-size:23px;font-weight:950;line-height:1.2}.jobReason{font-size:18px;font-weight:900;margin-top:12px}.remarks{margin-top:12px;padding:12px;border-radius:11px;background:var(--panel2);border:1px solid var(--line);font-size:15px;line-height:1.35;white-space:pre-wrap}.nav{min-height:60px;background:#136fa7}.steps{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:9px}.steps .btn{min-height:74px;margin:0}.statusChoice{display:grid;grid-template-columns:1fr 1fr;gap:10px}.statusChoice .btn{min-height:82px;margin:0;font-size:17px}.notice{padding:11px;border-radius:10px;background:#3c2d11;border:1px solid #755d28;color:#f2d58b;font-weight:900;font-size:13px}.receipt{padding:11px;border-radius:10px;background:#123622;border:1px solid #2e754b;color:#9ce7b4;font-weight:900;font-size:13px;margin-top:10px}.offline{position:fixed;left:10px;right:10px;bottom:10px;z-index:30;background:#733f18;color:#ffe1ae;border:1px solid #b97531;border-radius:10px;padding:11px;font-weight:900;font-size:13px}.small{color:var(--muted);font-size:12px;line-height:1.4}.linkbtn{background:none;border:0;color:var(--muted);font-weight:900;text-decoration:underline;padding:8px 0;margin-top:6px}
+@media(max-width:560px){.steps,.statusChoice{grid-template-columns:1fr}.brand h1{font-size:18px}.vehicleName{font-size:21px}.jobAddr{font-size:21px}}
+</style>
+</head>
+<body>
+<header class="top"><div class="toprow"><div class="brand"><small>FREIWILLIGE FEUERWEHR STADT SALZBURG</small><h1 id="headVehicle">FAHRZEUGTERMINAL</h1></div><div class="tools"><button class="iconbtn" onclick="toggleTheme()" id="themeBtn" title="Hell/Dunkel">☾</button><button class="iconbtn" onclick="openSettings()" title="Einstellungen">⚙</button></div></div><div class="conn"><span id="dot" class="dot"></span><span id="conn">Nicht verbunden</span></div></header>
+<main class="wrap">
+<section id="setup" class="card">
+ <div class="title">Einmalige Einrichtung</div>
+ <label>Benutzername<input id="user" value="FF-Fahrzeuge"></label>
+ <label>HiveMQ-Passwort<input id="pass" type="password" placeholder="Passwort FF-Fahrzeuge"></label>
+ <label>Fahrzeug-Kopplungscode<input id="pair" placeholder="FS1:… aus Leitstelle"></label>
+ <button class="btn green" onclick="saveAndConnect()">TERMINAL VERBINDEN</button>
+ <div class="small" style="margin-top:10px">Die Zuordnung wird auf diesem Gerät gespeichert. Das Fahrzeug kann später über ⚙ neu gekoppelt werden.</div>
+</section>
+
+<section id="vehicle" class="card hidden">
+ <div class="vehicleLine"><div><div id="vname" class="vehicleName">—</div><div id="crewLine" class="small">Mannschaft nicht bestätigt</div></div><span id="vstatus" class="badge">—</span></div>
+ <div id="receipt" class="receipt hidden"></div>
+</section>
+
+<section id="crew" class="card hidden">
+ <div class="title">Mannschaft melden</div>
+ <label>Mannschaftsstärke<select id="strength"></select></label>
+ <button class="btn green" onclick="sendCrew()">MANNSCHAFT MELDEN</button>
+ <div id="crewState" class="small" style="margin-top:10px">Mannschaft noch nicht bestätigt.</div>
+</section>
+
+<section id="waiting" class="card hidden waiting">
+ <div class="waitingIcon">◉</div><div class="waitingTitle">WARTEN AUF EINSATZ</div><div id="waitingCrew" class="waitingSub">Mannschaft —</div>
+</section>
+
+<section id="offState" class="card hidden waiting">
+ <div class="waitingIcon">●</div><div class="waitingTitle" style="color:#e35c5c">NICHT EINSATZBEREIT</div><div id="offCrew" class="waitingSub">Mannschaft —</div>
+ <button class="btn green" onclick="reportReady()">WIEDER EINSATZBEREIT MELDEN</button>
+</section>
+
+<section id="incident" class="card hidden">
+ <div class="title">Aktueller Einsatz</div>
+ <div id="newJob" class="notice hidden">NEUER EINSATZAUFTRAG · bitte übernehmen</div>
+ <div id="addr" class="jobAddr">—</div>
+ <div id="reason" class="jobReason">—</div>
+ <div id="remarks" class="remarks">Keine Bemerkungen</div>
+ <button class="btn nav" onclick="nav()">⌖ NAVIGATION STARTEN</button>
+ <div class="steps">
+   <button id="ackBtn" class="btn" onclick="sendStatus('ack')">AUFTRAG ÜBERNOMMEN</button>
+   <button id="departedBtn" class="btn orange" onclick="sendStatus('departed')">AUSGERÜCKT</button>
+   <button id="arrivalBtn" class="btn" onclick="sendStatus('arrival')">EINGETROFFEN</button>
+   <button id="doneBtn" class="btn green" onclick="showDoneChoice()">ABGEARBEITET</button>
+ </div>
+</section>
+
+<section id="doneChoice" class="card hidden">
+ <div class="title">Status nach Abarbeitung</div>
+ <div class="statusChoice"><button class="btn green" onclick="finish('Einsatzbereit')">EINSATZBEREIT</button><button class="btn red" onclick="finish('Nicht einsatzbereit')">NICHT EINSATZBEREIT</button></div>
+ <button class="linkbtn" onclick="hideDoneChoice()">Abbrechen</button>
+</section>
+</main>
+<div id="offline" class="offline hidden">Keine Verbindung · Meldung wird lokal gespeichert und automatisch nachgesendet.</div>
+<script>
+const BROKER='wss://bc1a3de0e6b24805a5c5e7d60c06da61.s1.eu.hivemq.cloud:8884/mqtt';
+const IN='florian-salzburg/v1/inbox', P='florian-salzburg/v1/vehicle/';
+const STORE='fsWebVehicleV1', QUEUE='fsWebVehicleQueueV1';
+let client=null,token='',st=null,queue=[],hb=null; const $=id=>document.getElementById(id);
+function mid(){return 'm-'+Date.now()+'-'+Math.random().toString(16).slice(2)}
+function cfg(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch{return {}}}
+function saveCfg(x){localStorage.setItem(STORE,JSON.stringify(x))}
+function setConn(text,cls=''){ $('conn').textContent=text;$('dot').className='dot '+cls;$('offline').classList.toggle('hidden',cls==='ok') }
+function theme(){return localStorage.getItem('fsWebTheme')||'dark'}
+function applyTheme(){document.documentElement.dataset.theme=theme();$('themeBtn').textContent=theme()==='dark'?'☀':'☾'}
+function toggleTheme(){localStorage.setItem('fsWebTheme',theme()==='dark'?'light':'dark');applyTheme()}
+function load(){applyTheme();const c=cfg();if(c.user)$('user').value=c.user;if(c.pass)$('pass').value=c.pass;if(c.pair)$('pair').value='FS1:'+c.pair;queue=JSON.parse(localStorage.getItem(QUEUE)||'[]');if(c.pass&&c.pair)connect()}
+function saveAndConnect(){let p=$('pair').value.trim();if(p.startsWith('FS1:'))p=p.slice(4);const pass=$('pass').value;const user=$('user').value.trim();if(!p||!pass||!user)return alert('Bitte Benutzername, Passwort und Kopplungscode eingeben.');saveCfg({pass,pair:p,user});connect()}
+function openSettings(){if(!confirm('Einrichtung / Fahrzeugkopplung öffnen?'))return;$('setup').classList.remove('hidden');$('setup').scrollIntoView({behavior:'smooth'})}
+function connect(){const c=cfg();token=c.pair||'';if(!token||!c.pass)return;if(typeof mqtt==='undefined')return setConn('MQTT-Bibliothek konnte nicht geladen werden','bad');if(client)try{client.end(true)}catch{};setConn('Verbindung wird aufgebaut …','wait');client=mqtt.connect(BROKER,{username:(c.user||$('user').value.trim()||'FF-Fahrzeuge'),password:c.pass,clientId:'fs-web-'+Math.random().toString(16).slice(2),clean:true,connectTimeout:12000,reconnectPeriod:3000,protocolVersion:4});client.on('connect',()=>{setConn('Mit Leitstelle verbunden','ok');client.subscribe(P+token+'/#',{qos:1});sendRaw('stateRequest',{},false);flush();clearInterval(hb);hb=setInterval(()=>sendRaw('heartbeat',{},false),10000)});client.on('message',(topic,p)=>{let x;try{x=JSON.parse(p.toString())}catch{return}if(topic.endsWith('/state')){st=x;render()}else if(topic.endsWith('/receipt'))showReceipt(x)});client.on('offline',()=>setConn('Offline · Wiederverbindung läuft','wait'));client.on('reconnect',()=>setConn('Wiederverbinden …','wait'));client.on('error',e=>{const msg=(e&&e.message)?e.message:String(e||'Unbekannter Fehler');setConn('MQTT-Fehler: '+msg,'bad');console.error(e)})}
+function sendRaw(type,payload,store=true){const m={id:mid(),type,token,payload,sentAt:new Date().toISOString()};if(!client?.connected){if(store){queue.push(m);localStorage.setItem(QUEUE,JSON.stringify(queue))}return m.id}client.publish(IN,JSON.stringify(m),{qos:1,retain:false});return m.id}
+function flush(){queue=JSON.parse(localStorage.getItem(QUEUE)||'[]');if(!client?.connected)return;for(const m of queue)client.publish(IN,JSON.stringify(m),{qos:1});queue=[];localStorage.removeItem(QUEUE)}
+function showReceipt(r){const e=$('receipt');e.classList.remove('hidden');e.textContent=(r.ok?'✓ ':'⚠ ')+(r.message||'Quittierung erhalten')+(r.serverAt?' · '+new Date(r.serverAt).toLocaleTimeString('de-AT'):'');setTimeout(()=>e.classList.add('hidden'),7000)}
+function fmt(x){return x?new Date(x).toLocaleTimeString('de-AT'):'—'}
+function render(){if(!st?.vehicle)return;const v=st.vehicle;$('setup').classList.add('hidden');$('vehicle').classList.remove('hidden');$('headVehicle').textContent=v.name;$('vname').textContent=v.name;$('vstatus').textContent=v.status;$('vstatus').className='badge '+(v.status==='Einsatzbereit'?'ready':v.status==='Nicht einsatzbereit'?'off':'');const crewConfirmed=!!v.crew_confirmed_at&&Number(v.crew_count||0)>0;$('crewLine').textContent=crewConfirmed?'Mannschaft '+v.crew_text+' · bestätigt':'Mannschaft nicht bestätigt';
+ const opts=String(v.allowed_crews||'1:0|1:1|1:2|1:3|1:4|1:5|1:6|1:7|1:8').split('|');const cur=$('strength').value;$('strength').innerHTML='<option value="">— Stärke wählen —</option>'+opts.map(x=>'<option>'+x+'</option>').join('');$('strength').value=cur||v.crew_text||'';
+ const r=st.crew_request;const pending=r?.status==='pending';$('crewState').textContent=pending?'⏳ Mannschaft '+r.crew_text+' wartet auf Bestätigung der Leitstelle.':r?.status==='rejected'?'⚠ Mannschaftsmeldung wurde abgelehnt.':crewConfirmed?'✓ Mannschaft '+v.crew_text+' von Leitstelle bestätigt.':'Mannschaft noch nicht bestätigt.';
+ const hasJob=!!(st.incident&&st.assignment);$('crew').classList.toggle('hidden',crewConfirmed&&!pending || hasJob);$('waiting').classList.add('hidden');$('offState').classList.add('hidden');$('incident').classList.add('hidden');$('doneChoice').classList.add('hidden');
+ if(hasJob){const i=st.incident,a=st.assignment;$('incident').classList.remove('hidden');$('addr').textContent=((i.street||'')+' '+(i.house_no||'')).trim()||'—';$('reason').textContent=i.reason||'—';$('remarks').textContent=(i.remarks||'').trim()||'Keine Bemerkungen';$('newJob').classList.toggle('hidden',!!a.tablet_ack_at);$('ackBtn').disabled=!!a.tablet_ack_at;$('departedBtn').disabled=!a.tablet_ack_at||!!a.departed_at;$('arrivalBtn').disabled=!a.departed_at||!!a.arrival_at;$('doneBtn').disabled=!a.arrival_at;return}
+ if(!crewConfirmed||pending){$('crew').classList.remove('hidden');return}
+ if(v.status==='Nicht einsatzbereit'){$('offState').classList.remove('hidden');$('offCrew').textContent='Mannschaft '+v.crew_text;return}
+ $('waiting').classList.remove('hidden');$('waitingCrew').textContent='Mannschaft '+v.crew_text+' · Leitstelle bestätigt'; }
+function sendCrew(){const crewText=$('strength').value;if(!crewText)return alert('Bitte Mannschaftsstärke wählen.');sendRaw('crewReport',{clientId:mid(),crewText,requestedStatus:'Einsatzbereit',clientAt:new Date().toISOString()});showReceipt({ok:true,message:'Mannschaft gemeldet · wartet auf Leitstelle'})}
+function sendStatus(action){if(!st?.assignment)return;sendRaw('status',{clientId:mid(),assignmentId:st.assignment.assignment_id,action,clientAt:new Date().toISOString()});showReceipt({ok:true,message:'Status gesendet · wartet auf Quittierung'})}
+function showDoneChoice(){$('doneChoice').classList.remove('hidden');$('doneChoice').scrollIntoView({behavior:'smooth'})}function hideDoneChoice(){$('doneChoice').classList.add('hidden')}
+function finish(postStatus){if(!st?.assignment)return;sendRaw('status',{clientId:mid(),assignmentId:st.assignment.assignment_id,action:'done',postStatus,clientAt:new Date().toISOString()});hideDoneChoice();showReceipt({ok:true,message:'Abgearbeitet gemeldet · '+postStatus})}
+function reportReady(){sendRaw('status',{clientId:mid(),assignmentId:0,action:'ready',clientAt:new Date().toISOString()});showReceipt({ok:true,message:'Einsatzbereit gemeldet · wartet auf Leitstelle'})}
+function nav(){if(!st?.incident)return;const i=st.incident;const q=`${i.street||''} ${i.house_no||''}, Salzburg, Österreich`;window.location.href='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q)}
+load();
+</script>
+</body></html>
+
 html[data-theme="light"]{--bg:#eef4f7;--panel:#fff;--panel2:#f7fafc;--line:#c7d8e2;--text:#163244;--muted:#6a8494;--shadow:0 10px 24px rgba(53,89,112,.12)}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);min-height:100vh}
 .top{position:sticky;top:0;z-index:20;background:var(--panel);border-bottom:1px solid var(--line);padding:12px 14px;box-shadow:0 4px 14px rgba(0,0,0,.12)}
