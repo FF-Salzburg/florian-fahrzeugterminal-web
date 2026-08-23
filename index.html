@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#081722">
-<title>Florian Salzburg · Fahrzeugterminal Paho</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
+<title>Florian Salzburg · Fahrzeugterminal</title>
+<script src="./mqtt.min.js"></script>
 <style>
 :root{
   font-family:Arial,Helvetica,sans-serif;
@@ -26,11 +26,11 @@ label{display:block;color:var(--muted);font-size:11px;font-weight:900;margin-bot
 </style>
 </head>
 <body>
-<header class="top"><div class="toprow"><div class="brand"><small>FREIWILLIGE FEUERWEHR STADT SALZBURG</small><h1 id="headVehicle">FAHRZEUGTERMINAL</h1></div><div class="tools"><button class="iconbtn" onclick="toggleTheme()" id="themeBtn" title="Hell/Dunkel">☾</button><button class="iconbtn" onclick="openSettings()" title="Einstellungen">⚙</button></div></div><div class="conn"><span id="dot" class="dot"></span><span id="conn">Nicht verbunden</span></div></header>
+<header class="top"><div class="toprow"><div class="brand"><small>FREIWILLIGE FEUERWEHR STADT SALZBURG</small><h1 id="headVehicle">FAHRZEUGTERMINAL</h1><small style="display:block;margin-top:3px;color:var(--muted);font-size:9px">Web-App V3 · lokale MQTT-Bibliothek</small></div><div class="tools"><button class="iconbtn" onclick="toggleTheme()" id="themeBtn" title="Hell/Dunkel">☾</button><button class="iconbtn" onclick="openSettings()" title="Einstellungen">⚙</button></div></div><div class="conn"><span id="dot" class="dot"></span><span id="conn">Nicht verbunden</span></div></header>
 <main class="wrap">
 <section id="setup" class="card">
- <div class="title">Einmalige Einrichtung · Paho-Test</div>
- <label>Benutzername<input id="user" value="FF-Fahrzeuge"></label>
+ <div class="title">Einmalige Einrichtung</div>
+ <label>Benutzername<input id="user" value="FF-Fahrzeuge" readonly></label>
  <label>HiveMQ-Passwort<input id="pass" type="password" placeholder="Passwort FF-Fahrzeuge"></label>
  <label>Fahrzeug-Kopplungscode<input id="pair" placeholder="FS1:… aus Leitstelle"></label>
  <button class="btn green" onclick="saveAndConnect()">TERMINAL VERBINDEN</button>
@@ -81,86 +81,30 @@ label{display:block;color:var(--muted);font-size:11px;font-weight:900;margin-bot
 </main>
 <div id="offline" class="offline hidden">Keine Verbindung · Meldung wird lokal gespeichert und automatisch nachgesendet.</div>
 <script>
-const MQTT_HOST='bc1a3de0e6b24805a5c5e7d60c06da61.s1.eu.hivemq.cloud';
-const MQTT_PORT=8884, MQTT_PATH='/mqtt';
+const BROKER='wss://bc1a3de0e6b24805a5c5e7d60c06da61.s1.eu.hivemq.cloud:8884/mqtt';
 const IN='florian-salzburg/v1/inbox', P='florian-salzburg/v1/vehicle/';
-const STORE='fsWebVehiclePahoV1', QUEUE='fsWebVehiclePahoQueueV1', OLDSTORE='fsWebVehicleV1';
+const STORE='fsWebVehicleV3', QUEUE='fsWebVehicleQueueV3';
 let client=null,token='',st=null,queue=[],hb=null; const $=id=>document.getElementById(id);
 function mid(){return 'm-'+Date.now()+'-'+Math.random().toString(16).slice(2)}
+
+function normalizePair(v){
+  let p=String(v||'').trim();
+  while(/^fs1:/i.test(p)) p=p.replace(/^fs1:/i,'').trim();
+  return p;
+}
+
 function cfg(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch{return {}}}
 function saveCfg(x){localStorage.setItem(STORE,JSON.stringify(x))}
 function setConn(text,cls=''){ $('conn').textContent=text;$('dot').className='dot '+cls;$('offline').classList.toggle('hidden',cls==='ok') }
 function theme(){return localStorage.getItem('fsWebTheme')||'dark'}
 function applyTheme(){document.documentElement.dataset.theme=theme();$('themeBtn').textContent=theme()==='dark'?'☀':'☾'}
 function toggleTheme(){localStorage.setItem('fsWebTheme',theme()==='dark'?'light':'dark');applyTheme()}
-function load(){
- applyTheme();
- const c=cfg();
- let old={};try{old=JSON.parse(localStorage.getItem(OLDSTORE)||'{}')}catch{}
- $('user').value=c.user||'FF-Fahrzeuge';
- if(c.pass)$('pass').value=c.pass;
- const pair=c.pair||old.pair||'';
- if(pair)$('pair').value='FS1:'+pair;
- queue=JSON.parse(localStorage.getItem(QUEUE)||'[]');
- if(c.pass&&pair){ if(!c.pair)saveCfg({user:c.user||'FF-Fahrzeuge',pass:c.pass,pair}); connect(); }
-}
-function saveAndConnect(){let p=$('pair').value.trim();if(p.startsWith('FS1:'))p=p.slice(4);const pass=$('pass').value;const user=$('user').value.trim();if(!p||!pass||!user)return alert('Bitte Benutzername, Passwort und Kopplungscode eingeben.');saveCfg({pass,pair:p,user});connect()}
+function load(){applyTheme();const c=cfg();if(c.user)$('user').value=c.user;if(c.pass)$('pass').value=c.pass;if(c.pair)$('pair').value='FS1:'+normalizePair(c.pair);queue=JSON.parse(localStorage.getItem(QUEUE)||'[]');if(c.pass&&c.pair)connect()}
+function saveAndConnect(){let p=normalizePair($('pair').value);const pass=$('pass').value;const user='FF-Fahrzeuge';if(!p||!pass)return alert('Bitte Passwort und Kopplungscode eingeben.');saveCfg({pass,pair:p,user});connect()}
 function openSettings(){if(!confirm('Einrichtung / Fahrzeugkopplung öffnen?'))return;$('setup').classList.remove('hidden');$('setup').scrollIntoView({behavior:'smooth'})}
-function isConnected(){return !!(client&&client.isConnected&&client.isConnected())}
-function reconnectLater(){clearTimeout(window.__pahoRetry);window.__pahoRetry=setTimeout(()=>{const c=cfg();if(c.pass&&c.pair&&!isConnected())connect()},3000)}
-function connect(){
- const c=cfg();token=c.pair||'';
- if(!token||!c.pass)return;
- if(typeof Paho==='undefined'||!Paho.MQTT)return setConn('Paho-MQTT-Bibliothek konnte nicht geladen werden','bad');
- try{if(client&&client.isConnected())client.disconnect()}catch{}
- setConn('Verbindung wird aufgebaut …','wait');
- const clientId='fs-paho-'+Date.now().toString(36)+'-'+Math.random().toString(16).slice(2,8);
- client=new Paho.MQTT.Client(MQTT_HOST,Number(MQTT_PORT),MQTT_PATH,clientId);
- client.onConnectionLost=(r)=>{
-   clearInterval(hb);
-   const msg=r&&r.errorMessage?r.errorMessage:'Verbindung getrennt';
-   setConn('Verbindung getrennt: '+msg,'wait');
-   reconnectLater();
- };
- client.onMessageArrived=(m)=>{
-   let x;try{x=JSON.parse(m.payloadString)}catch{return}
-   const topic=m.destinationName||'';
-   if(topic.endsWith('/state')){st=x;render()}else if(topic.endsWith('/receipt'))showReceipt(x)
- };
- client.connect({
-   useSSL:true,
-   userName:c.user||'FF-Fahrzeuge',
-   password:c.pass,
-   cleanSession:true,
-   keepAliveInterval:30,
-   timeout:15,
-   mqttVersion:4,
-   onSuccess:()=>{
-     setConn('Mit Leitstelle verbunden','ok');
-     client.subscribe(P+token+'/#',{qos:1,onSuccess:()=>{sendRaw('stateRequest',{},false);flush()},onFailure:(e)=>setConn('MQTT-Abo fehlgeschlagen: '+(e&&e.errorMessage||'unbekannt'),'bad')});
-     clearInterval(hb);hb=setInterval(()=>sendRaw('heartbeat',{},false),10000)
-   },
-   onFailure:(e)=>{
-     const msg=e&&e.errorMessage?e.errorMessage:'Verbindung abgelehnt';
-     setConn('MQTT-Fehler: '+msg,'bad');
-   }
- })
-}
-function mqttSend(topic,obj,qos=1){
- if(!isConnected())return false;
- const msg=new Paho.MQTT.Message(typeof obj==='string'?obj:JSON.stringify(obj));
- msg.destinationName=topic;msg.qos=qos;msg.retained=false;client.send(msg);return true
-}
-function sendRaw(type,payload,store=true){
- const m={id:mid(),type,token,payload,sentAt:new Date().toISOString()};
- if(!mqttSend(IN,m,1)){if(store){queue.push(m);localStorage.setItem(QUEUE,JSON.stringify(queue))}return m.id}
- return m.id
-}
-function flush(){
- queue=JSON.parse(localStorage.getItem(QUEUE)||'[]');if(!isConnected())return;
- const rest=[];for(const m of queue){try{if(!mqttSend(IN,m,1))rest.push(m)}catch{rest.push(m)}}
- queue=rest;if(queue.length)localStorage.setItem(QUEUE,JSON.stringify(queue));else localStorage.removeItem(QUEUE)
-}
+function connect(){const c=cfg();token=c.pair||'';if(!token||!c.pass)return;if(typeof mqtt==='undefined')return setConn('MQTT-Bibliothek fehlt im GitHub-Projekt (mqtt.min.js)','bad');if(client)try{client.end(true)}catch{};setConn('Verbindung wird aufgebaut …','wait');client=mqtt.connect(BROKER,{username:(c.user||$('user').value.trim()||'FF-Fahrzeuge'),password:c.pass,clientId:'fs-web-'+Math.random().toString(16).slice(2),clean:true,connectTimeout:12000,reconnectPeriod:3000,protocolVersion:4});client.on('connect',()=>{setConn('Mit Leitstelle verbunden','ok');client.subscribe(P+token+'/#',{qos:1});sendRaw('stateRequest',{},false);flush();clearInterval(hb);hb=setInterval(()=>sendRaw('heartbeat',{},false),10000)});client.on('message',(topic,p)=>{let x;try{x=JSON.parse(p.toString())}catch{return}if(topic.endsWith('/state')){st=x;render()}else if(topic.endsWith('/receipt'))showReceipt(x)});client.on('offline',()=>setConn('Offline · Wiederverbindung läuft','wait'));client.on('reconnect',()=>setConn('Wiederverbinden …','wait'));client.on('error',e=>{const msg=(e&&e.message)?e.message:String(e||'Unbekannter Fehler');setConn('MQTT-Fehler: '+msg,'bad');console.error(e)})}
+function sendRaw(type,payload,store=true){const m={id:mid(),type,token,payload,sentAt:new Date().toISOString()};if(!client?.connected){if(store){queue.push(m);localStorage.setItem(QUEUE,JSON.stringify(queue))}return m.id}client.publish(IN,JSON.stringify(m),{qos:1,retain:false});return m.id}
+function flush(){queue=JSON.parse(localStorage.getItem(QUEUE)||'[]');if(!client?.connected)return;for(const m of queue)client.publish(IN,JSON.stringify(m),{qos:1});queue=[];localStorage.removeItem(QUEUE)}
 function showReceipt(r){const e=$('receipt');e.classList.remove('hidden');e.textContent=(r.ok?'✓ ':'⚠ ')+(r.message||'Quittierung erhalten')+(r.serverAt?' · '+new Date(r.serverAt).toLocaleTimeString('de-AT'):'');setTimeout(()=>e.classList.add('hidden'),7000)}
 function fmt(x){return x?new Date(x).toLocaleTimeString('de-AT'):'—'}
 function render(){if(!st?.vehicle)return;const v=st.vehicle;$('setup').classList.add('hidden');$('vehicle').classList.remove('hidden');$('headVehicle').textContent=v.name;$('vname').textContent=v.name;$('vstatus').textContent=v.status;$('vstatus').className='badge '+(v.status==='Einsatzbereit'?'ready':v.status==='Nicht einsatzbereit'?'off':'');const crewConfirmed=!!v.crew_confirmed_at&&Number(v.crew_count||0)>0;$('crewLine').textContent=crewConfirmed?'Mannschaft '+v.crew_text+' · bestätigt':'Mannschaft nicht bestätigt';
