@@ -23,6 +23,9 @@ label{display:block;color:var(--muted);font-size:11px;font-weight:900;margin-bot
 .waiting{text-align:center;padding:34px 10px}.waitingIcon{font-size:40px;margin-bottom:8px}.waitingTitle{font-size:25px;font-weight:950}.waitingSub{color:var(--muted);margin-top:6px;font-size:13px}.crewBig{font-size:27px;font-weight:950;margin:2px 0 10px}.ack{padding:11px 12px;border-radius:10px;background:#123622;border:1px solid #2e754b;color:#9ce7b4;font-weight:900;font-size:13px}html[data-theme="light"] .ack{background:#eaf8ef;color:#267448;border-color:#b2d8c0}
 .jobAddr{font-size:23px;font-weight:950;line-height:1.2}.jobReason{font-size:18px;font-weight:900;margin-top:12px}.remarks{margin-top:12px;padding:12px;border-radius:11px;background:var(--panel2);border:1px solid var(--line);font-size:15px;line-height:1.35;white-space:pre-wrap}.nav{min-height:60px;background:#136fa7}.steps{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:9px}.steps .btn{min-height:74px;margin:0}.statusChoice{display:grid;grid-template-columns:1fr 1fr;gap:10px}.statusChoice .btn{min-height:82px;margin:0;font-size:17px}.notice{padding:11px;border-radius:10px;background:#3c2d11;border:1px solid #755d28;color:#f2d58b;font-weight:900;font-size:13px}.receipt{padding:11px;border-radius:10px;background:#123622;border:1px solid #2e754b;color:#9ce7b4;font-weight:900;font-size:13px;margin-top:10px}.offline{position:fixed;left:10px;right:10px;bottom:10px;z-index:30;background:#733f18;color:#ffe1ae;border:1px solid #b97531;border-radius:10px;padding:11px;font-weight:900;font-size:13px}.small{color:var(--muted);font-size:12px;line-height:1.4}.linkbtn{background:none;border:0;color:var(--muted);font-weight:900;text-decoration:underline;padding:8px 0;margin-top:6px}
 @media(max-width:560px){.steps,.statusChoice{grid-template-columns:1fr}.brand h1{font-size:18px}.vehicleName{font-size:21px}.jobAddr{font-size:21px}}
+
+.debugbox{margin-top:10px;padding:10px;border-radius:10px;background:#07131d;color:#cde8f7;border:1px solid #2b5068;font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;max-height:220px;overflow:auto}
+html[data-theme="light"] .debugbox{background:#eef5f8;color:#17394d}
 </style>
 </head>
 <body>
@@ -35,6 +38,11 @@ label{display:block;color:var(--muted);font-size:11px;font-weight:900;margin-bot
  <label>Fahrzeug-Kopplungscode<input id="pair" placeholder="FS1:… aus Leitstelle"></label>
  <button class="btn green" onclick="saveAndConnect()">TERMINAL VERBINDEN</button>
  <div class="small" style="margin-top:10px">Die Zuordnung wird auf diesem Gerät gespeichert. Das Fahrzeug kann später über ⚙ neu gekoppelt werden.</div>
+</section>
+<section id="diagCard" class="card">
+ <div class="title">Verbindungsdiagnose</div>
+ <div id="diag" class="debugbox">Seite geladen …</div>
+ <button class="linkbtn" onclick="copyDiag()">Diagnose kopieren</button>
 </section>
 
 <section id="vehicle" class="card hidden">
@@ -84,7 +92,10 @@ label{display:block;color:var(--muted);font-size:11px;font-weight:900;margin-bot
 const BROKER='wss://bc1a3de0e6b24805a5c5e7d60c06da61.s1.eu.hivemq.cloud:8884/mqtt';
 const IN='florian-salzburg/v1/inbox', P='florian-salzburg/v1/vehicle/';
 const STORE='fsWebVehicleV1', QUEUE='fsWebVehicleQueueV1';
-let client=null,token='',st=null,queue=[],hb=null; const $=id=>document.getElementById(id);
+let client=null,token='',st=null,queue=[],hb=null,connectTimer=null; const $=id=>document.getElementById(id);
+function dlog(msg){const e=$('diag');if(!e)return;const t=new Date().toLocaleTimeString('de-AT');e.textContent+=(e.textContent?'\n':'')+t+'  '+msg;e.scrollTop=e.scrollHeight}
+function copyDiag(){const t=$('diag')?.textContent||'';navigator.clipboard?.writeText(t).then(()=>alert('Diagnose kopiert')).catch(()=>alert(t))}
+
 function mid(){return 'm-'+Date.now()+'-'+Math.random().toString(16).slice(2)}
 function cfg(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch{return {}}}
 function saveCfg(x){localStorage.setItem(STORE,JSON.stringify(x))}
@@ -92,11 +103,35 @@ function setConn(text,cls=''){ $('conn').textContent=text;$('dot').className='do
 function theme(){return localStorage.getItem('fsWebTheme')||'dark'}
 function applyTheme(){document.documentElement.dataset.theme=theme();$('themeBtn').textContent=theme()==='dark'?'☀':'☾'}
 function toggleTheme(){localStorage.setItem('fsWebTheme',theme()==='dark'?'light':'dark');applyTheme()}
-function load(){applyTheme();const c=cfg();if(c.user)$('user').value=c.user;if(c.pass)$('pass').value=c.pass;if(c.pair)$('pair').value='FS1:'+c.pair;queue=JSON.parse(localStorage.getItem(QUEUE)||'[]');if(c.pass&&c.pair)connect()}
+function load(){applyTheme();dlog('MQTT-Bibliothek: '+(typeof mqtt==='undefined'?'NICHT GELADEN':'geladen'));const c=cfg();if(c.user)$('user').value=c.user;if(c.pass)$('pass').value=c.pass;if(c.pair)$('pair').value='FS1:'+c.pair;queue=JSON.parse(localStorage.getItem(QUEUE)||'[]');dlog('Gespeicherte Kopplung: '+(c.pair?'vorhanden':'keine'));if(c.pass&&c.pair){dlog('Auto-Verbindungsversuch startet');connect()}}
 function saveAndConnect(){let p=$('pair').value.trim();if(p.startsWith('FS1:'))p=p.slice(4);const pass=$('pass').value;const user=$('user').value.trim();if(!p||!pass||!user)return alert('Bitte Benutzername, Passwort und Kopplungscode eingeben.');saveCfg({pass,pair:p,user});connect()}
 function openSettings(){if(!confirm('Einrichtung / Fahrzeugkopplung öffnen?'))return;$('setup').classList.remove('hidden');$('setup').scrollIntoView({behavior:'smooth'})}
-function connect(){const c=cfg();token=c.pair||'';if(!token||!c.pass)return;if(typeof mqtt==='undefined')return setConn('MQTT-Bibliothek konnte nicht geladen werden','bad');if(client)try{client.end(true)}catch{};setConn('Verbindung wird aufgebaut …','wait');client=mqtt.connect(BROKER,{username:(c.user||$('user').value.trim()||'FF-Fahrzeuge'),password:c.pass,clientId:'fs-web-'+Math.random().toString(16).slice(2),clean:true,connectTimeout:12000,reconnectPeriod:3000,protocolVersion:4});client.on('connect',()=>{setConn('Mit Leitstelle verbunden','ok');client.subscribe(P+token+'/#',{qos:1});sendRaw('stateRequest',{},false);flush();clearInterval(hb);hb=setInterval(()=>sendRaw('heartbeat',{},false),10000)});client.on('message',(topic,p)=>{let x;try{x=JSON.parse(p.toString())}catch{return}if(topic.endsWith('/state')){st=x;render()}else if(topic.endsWith('/receipt'))showReceipt(x)});client.on('offline',()=>setConn('Offline · Wiederverbindung läuft','wait'));client.on('reconnect',()=>setConn('Wiederverbinden …','wait'));client.on('error',e=>{const msg=(e&&e.message)?e.message:String(e||'Unbekannter Fehler');setConn('MQTT-Fehler: '+msg,'bad');console.error(e)})}
-function sendRaw(type,payload,store=true){const m={id:mid(),type,token,payload,sentAt:new Date().toISOString()};if(!client?.connected){if(store){queue.push(m);localStorage.setItem(QUEUE,JSON.stringify(queue))}return m.id}client.publish(IN,JSON.stringify(m),{qos:1,retain:false});return m.id}
+function connect(){
+ const c=cfg();token=c.pair||'';
+ dlog('Verbinden angefordert · Benutzer='+(c.user||$('user').value.trim()||'FF-Fahrzeuge')+' · Token='+(token?'vorhanden':'FEHLT'));
+ if(!token||!c.pass){dlog('ABBRUCH: Token oder Passwort fehlt');return}
+ if(typeof mqtt==='undefined'){dlog('ABBRUCH: MQTT-Bibliothek fehlt');return setConn('MQTT-Bibliothek konnte nicht geladen werden','bad')}
+ if(client)try{client.end(true)}catch{}
+ clearTimeout(connectTimer);
+ setConn('Verbindung wird aufgebaut …','wait');
+ dlog('Broker: '+BROKER);
+ client=mqtt.connect(BROKER,{username:(c.user||$('user').value.trim()||'FF-Fahrzeuge'),password:c.pass,clientId:'fs-web-'+Math.random().toString(16).slice(2),clean:true,connectTimeout:15000,reconnectPeriod:0,protocolVersion:4});
+ connectTimer=setTimeout(()=>{if(!client?.connected){dlog('TIMEOUT: nach 18 Sekunden kein CONNECT-Event');setConn('MQTT-Verbindung Zeitüberschreitung','bad')}},18000);
+ client.on('connect',pkt=>{
+   clearTimeout(connectTimer);dlog('CONNECT OK · sessionPresent='+(pkt?.sessionPresent?'ja':'nein'));setConn('Mit Leitstelle verbunden','ok');
+   client.subscribe(P+token+'/#',{qos:1},err=>{if(err){dlog('SUBSCRIBE FEHLER: '+err.message)}else{dlog('SUBSCRIBE OK: '+P+token+'/#')}});
+   const sid=sendRaw('stateRequest',{},false);dlog('stateRequest gesendet · '+sid);
+   const hid=sendRaw('heartbeat',{},false);dlog('erster Heartbeat gesendet · '+hid);
+   flush();clearInterval(hb);hb=setInterval(()=>{const id=sendRaw('heartbeat',{},false);dlog('Heartbeat gesendet · '+id)},10000)
+ });
+ client.on('message',(topic,p)=>{dlog('NACHRICHT empfangen: '+topic);let x;try{x=JSON.parse(p.toString())}catch{dlog('JSON ungültig');return}if(topic.endsWith('/state')){st=x;dlog('STATE empfangen · Fahrzeug='+(x?.vehicle?.name||'—'));render()}else if(topic.endsWith('/receipt'))showReceipt(x)});
+ client.on('offline',()=>{dlog('EVENT offline');setConn('Offline','wait')});
+ client.on('reconnect',()=>{dlog('EVENT reconnect');setConn('Wiederverbinden …','wait')});
+ client.on('close',()=>dlog('EVENT close'));
+ client.on('disconnect',pkt=>dlog('EVENT disconnect · '+JSON.stringify(pkt||{})));
+ client.on('error',e=>{const msg=(e&&e.message)?e.message:String(e||'Unbekannter Fehler');dlog('ERROR: '+msg);setConn('MQTT-Fehler: '+msg,'bad');console.error(e)})
+}
+function sendRaw(type,payload,store=true){const m={id:mid(),type,token,payload,sentAt:new Date().toISOString()};if(!client?.connected){dlog('NICHT GESENDET ('+type+'): Client nicht verbunden');if(store){queue.push(m);localStorage.setItem(QUEUE,JSON.stringify(queue))}return m.id}client.publish(IN,JSON.stringify(m),{qos:1,retain:false});return m.id}
 function flush(){queue=JSON.parse(localStorage.getItem(QUEUE)||'[]');if(!client?.connected)return;for(const m of queue)client.publish(IN,JSON.stringify(m),{qos:1});queue=[];localStorage.removeItem(QUEUE)}
 function showReceipt(r){const e=$('receipt');e.classList.remove('hidden');e.textContent=(r.ok?'✓ ':'⚠ ')+(r.message||'Quittierung erhalten')+(r.serverAt?' · '+new Date(r.serverAt).toLocaleTimeString('de-AT'):'');setTimeout(()=>e.classList.add('hidden'),7000)}
 function fmt(x){return x?new Date(x).toLocaleTimeString('de-AT'):'—'}
